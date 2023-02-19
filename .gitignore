@@ -2,7 +2,6 @@
 *.log
 logs/
 /*.vsix
-*.zip
 *.map
 coverage/
 notes.md
