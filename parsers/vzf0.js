@@ -6,11 +6,22 @@ registerFileType((fileExt, filePath, fileData) => {
     if (fileExt.toLowerCase() === 'vz') {
 	 	const headerArray = fileData.getBytesAt(0, 4);
 	 	const header = String.fromCharCode(...headerArray)
-	 	if (header === 'VZF0' || header == 'VZFO')
+	 	if (header === 'VZF0' || header == 'VZFO'
+			|| (headerArray[0] == 0x20 && headerArray[1] == 0x20 && headerArray[2] == 0 && headerArray[3] == 0))
 			return true;
 	}
 	return false;
 });
+
+
+/**
+ * Header structure parser
+ * +0 	FileId (VZF0)
+ * +4	Program name (16 bytes + 0x00 byte terminator) 
+ * +21	content type (0xf0, 0xf1)
+ * +22 	16bit addres to load rest of file (also start address for binary file)
+ * +24	content bytes
+ */
 
 /**
  * Parser for VZ files.
@@ -22,12 +33,15 @@ registerParser(() => {
     // file desc ID
     read(4);
     var fileId = getStringValue();
+	var fileIdBytes = getData();
     if (fileId == 'VZF0')
 	    addRow('VZF0 id', fileId, 'Standard VZF0 file description header');
-    else 
+    else if (fileId == 'VZFO') 
 	    addRow('VZF0 id', fileId, '<span style="color: red;">WARN</span>: Nonstandard VZ file description header');
-
-    
+	else if (fileIdBytes[0] == 0x20 && fileIdBytes[1] == 0x20 && fileIdBytes[2] == 0x00 && fileIdBytes[3] == 0x00) 
+	    addRow('VZF0 id', getHexSequence(fileIdBytes), '<span style="color: red;">WARN</span>: Nonstandard VZ file description header (zk88dk)');
+		else if (fileIdBytes[0] == 0x20 && fileIdBytes[1] == 0x20 && fileIdBytes[2] == 0x00 && fileIdBytes[3] == 0x00) 
+    addRow('VZF0 id', getHexSequence(fileIdBytes), '<span style="color: red;">WARN</span>: Nonstandard VZ file description header');
     // Program name 17
     read(17)
 	addRow('Program Name', '"'+getStringValue()+'"', 'Internal Program name');
@@ -37,54 +51,90 @@ registerParser(() => {
     const ftype = getNumberValue();
 
     if (ftype == 0xf0) {
-        addRow('Content Type','BASIC [F0]', 'BASIC Program inside (could be laucher for binary code)');
+
+        /*******************************************************************
+         * BASIC lines
+         *******************************************************************/
+
+        addRow('Type','[F0] BASIC', 'BASIC Program inside (could be laucher for binary code)');
         // load/start address
         read(2);
-        let basicLineAbsAddr = getHex0xValue();
-        addRow('Load Addr',basicLineAbsAddr, 'Addres to load BASIC bytes. Start of BASIC Lines');
-        while(!endOfFile()) {
-            readRowWithDetails(basicLineAbsAddr, () => {
-                retVal = { value: '0', description: 'End of BASIC Program' };
-                read(2);
-                let nextAbsAddr = getHex0xValue();
-                addRow('Next Addr', nextAbsAddr, 'Address of next BASIC line data')
-                if (nextAbsAddr != '0x0000') {
-                    read(2);
-                    retVal.value = getNumberValue();
-                    addRow('Line No', retVal.value, 'BASIC Line number');
-                    readUntil(0);
+        let basicLineAbsAddr = getNumberValue();
+        let basicLineHexAddr = getHex0xValue();
+        addRow('Load Addr',basicLineHexAddr, 'Addres to load BASIC bytes. Start of BASIC Lines');
+        
+		while(!endOfFile() && basicLineAbsAddr != 0) {
+            readRowWithDetails(basicLineHexAddr, () => {
+                retVal = { value: basicLineAbsAddr, description: 'End of BASIC Program' };
+                // BASIC next line absolute address
+				read(2);
+                let nextAbsAddr = getNumberValue();
+                let nextHexAddr = getHex0xValue();
+                addRow('Next Addr', nextHexAddr, 'Address of next BASIC line data')
+                // if 0000 there is no more BASIC Program data
+				if (nextAbsAddr != 0) {
+                    // 16-bit Line Number
+					read(2);
+                    let basicLineNo = getNumberValue();
+                    addRow('Line No', basicLineNo, 'BASIC Line number');
+                    // Line body data terminated by 0
+					readUntil(0);
                     let basicLineData = getData();
-                    retVal.description = convertToBasic(basicLineData);
-                    addRow('Line Data', 'BASIC', basicLineData);
+                    let basicLineText = convertToBasic(basicLineData, basicLineNo);
+					retVal.value = basicLineAbsAddr;
+					retVal.description = basicLineText;
+                    addRow('Line Data', 'Bytes', getHexSequence(basicLineData));
                     read(1);
-                    addRow('Terminator', getNumberValue());
+                    addRow('Terminator', getNumberValue(), 'Line terminator');
                 }
                 basicLineAbsAddr = nextAbsAddr;
+                basicLineHexAddr = nextHexAddr;
                 return retVal;
             });        
         }
+		if (!endOfFile()) {
+			read();
+			addMemDump();
+		}
     } else if (ftype == 0xf1) {
         
         /*******************************************************************
          * Binary code to execute
          *******************************************************************/
-        addRow('Contetnt Type','Binary [F1]', 'Binary code to execute');
+        addRow('Type','[F1] Binary', 'Binary code to execute');
         // load/start address
         read(2);
         addRow('Load Addr',getHex0xValue(), 'Addres to load following code. Start of execution');
         
-        read(); //read to the end
-        addRow('Code Dump');
-        addDetails(() => {
-            read();
-            addMemDump();
-        });
+        //read(); //read to the end
+        //addRow('Code Dump');
+        read();
+        addMemDump();
+
     } else {
-        addRow('Contetnt Type','Unknown [' + ftype.toString(16) + ']', 'Unknown. Could be internal format for specific program');
+        
+		addRow('Type','[' + getHexByte(ftype) + '] Unknown', 'Unknown. Could be internal format for specific program');
+        // load/start address
+        read(2);
+        addRow('Load Addr',getHex0xValue(), 'Addres to load following code. Start of execution');
+        read();
+        addMemDump();
 
     }
 
 });
+function getHexByte(b) {
+	var c = b.toString(16).toUpperCase();
+	if (c.length == 1) c = '0'+c;
+	return c;
+}
+function getHexSequence(data) {
+	var s = '';
+	data.forEach(b => {
+		s += getHexByte(b) + ' ';
+	});
+	return s;
+}
 // codes 01..1f (when inside quoted string) -> "{x}" ctrl chars
 // codes 20..5f (when inside quoted string) -> chr(x) ascii
 // codes 60..7f (when inside quoted string) -> chr(x-0x40) ascii
@@ -123,8 +173,8 @@ function getCmdText(token) {
 function getSemigraphicChar(token) {
     return '&#xe0'+token.toString(16)+';';
 }
-function convertToBasic(data) {
-    let result = '';
+function convertToBasic(data, lineNo=-1) {
+    let result = lineNo >= 0 ? lineNo.toString() + ' ' : '';
     var inString = false;
     data.forEach(b => {
         if (b < 0x20) { // control chars - invalid
@@ -151,6 +201,6 @@ function convertToBasic(data) {
                 result += '{'+b+'}';
             }
         }
-    });
-    return '<span style="font-family: Hot Coco; white-space: pre">' + result + '</span>';
+	});
+    return '<span style="font-family: Hot Coco; font-size: 110%; white-space: pre; color: #80ff80">' + result + '</span>';
 };

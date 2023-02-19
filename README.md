@@ -13,6 +13,9 @@ Parser is created to use by **Binary File Viewer** inside VS Code (most likely a
 1. Copy 'vzf0.js' file to chosen folder (e.g.: C:\repos\vz-view-plugin\)
 2. Install "Binary File Viewer" through Visual Studio Code Marketplace.
 3. Open Extension Settings and add Parsers Folder where is 'vzf0.js' file (e.g.: C:\repos\vz-view-plugin\)
+4. (optional) Install **Hot Coco** font from fonts/hotcoco.zip file.
+
+## Usage
 
 1. In the vscode explorer right-click the binary file.
 2. Choose 'Open with Binary File Viewer'.
