@@ -44,8 +44,7 @@ registerFileType((fileExt, filePath, fileData) => {
  * 15	5 bytes		- GAP2 = 0x80,0x80,0x80,0x80,0x80
  * 20	1 byte		- GAP2 = 0x00
  * 21   4 bytes		- IDAM End = 0xc3, 0x18, 0xe7, 0xfe
- * 25   2 bytes		- CRC of Sector data  
- * Total 27 bytes	------------------------------------------------------
+ * Total 25 bytes	------------------------------------------------------
  */
 
 /*******
@@ -59,8 +58,7 @@ registerFileType((fileExt, filePath, fileData) => {
  * 14	6 bytes		- GAP2 = 0x80,0x80,0x80,0x80,0x80,0x80
  * 20	1 byte		- GAP2 = 0x00
  * 21   4 bytes		- IDAM End = 0xc3, 0x18, 0xe7, 0xfe
- * 25   2 bytes		- CRC of Sector data  
- * Total 27 bytes	------------------------------------------------------
+ * Total 25 bytes	------------------------------------------------------
  */
 
 function getHexByte(b) {
