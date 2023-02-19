@@ -2,7 +2,13 @@
 
 Custom parser to get quick preview of varies VZ200/VZ300 Basic and binary files.
 
-Parser is created to use by **Binary File Viewer** by **maziac** VS Code (most likely along with **DeZog** debugger).
+Parser is created to use from [**"Binary File Viewer"**](https://github.com/maziac/binary-file-viewer) by **maziac** VS Code (most likely along with **DeZog** debugger).
+
+VZ BASIC file view
+![VZ BASIC file view](docs/vz-preview-1.png)
+
+VZ mixed BASIC and Binary file view
+![VZ mixed BASIC and Binary file view](docs/vz-preview-2.png)
 
 ## Supported files
 
@@ -36,7 +42,7 @@ As for now Parser supports Content Types:
  ## Install
 
 1. Copy 'vzf0.js' file to chosen folder (e.g.: C:\repos\vz-view-plugin\)
-2. Install **"Binary File Viewer"** through Visual Studio Code Marketplace.
+2. Install [**"Binary File Viewer"**](https://github.com/maziac/binary-file-viewer) through Visual Studio Code Marketplace.
 3. Open Extension Settings and add Parsers Folder where is 'vzf0.js' file (e.g.: C:\repos\vz-view-plugin\)
 4. (optional) Install **Hot Coco** font from fonts/hotcoco.zip file.
 
