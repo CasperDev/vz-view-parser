@@ -45,7 +45,10 @@ registerParser(() => {
     // Program name 17
     read(17)
 	addRow('Program Name', '"'+getStringValue()+'"', 'Internal Program name');
-
+	addDetails(()=>{
+		read(17);
+		addMemDump();
+	});
     // File type byte
     read(1);
     const ftype = getNumberValue();
