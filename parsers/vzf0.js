@@ -186,7 +186,11 @@ function convertToBasic(data, lineNo=-1) {
             if (b == 0x22) { inString = inString == true ? false : true; };
             if (b == 0x5f)
                 result += 0xe01f;
-            else
+            else if (b == 0x3c)
+				result += '&lt;';
+			else if (b == 0x3e)
+				result += '&gt;';
+			else
                 result += String.fromCharCode(b);
         } else if (b < 0x80) { // ascii converted to capitalics (switch??)
             result += String.fromCharCode(b-0x40);
