@@ -4,7 +4,7 @@
  */
 registerFileType((fileExt, filePath, fileData) => {
 	// Check for vz extension
-    if (fileExt.toLowerCase() === 'dsk') {
+    if (fileExt.toLowerCase() === 'dsk' || fileExt.toLowerCase() === 'dvz') {
 		let headerBytes = fileData.getBytesAt(0,27);
 		let header = parseSectorHeader(headerBytes);
 		return header.valid;
@@ -126,96 +126,103 @@ registerParser(() => {
     
 
     addStandardHeader();
-	// 40 tracks to read
+	
+	// -------  40 tracks to read -------------
 
 	for(let trk=0; trk < 40; trk++) {
-	
-		let currentTrk = trk;
-		readRowWithDetails("Track", () => {
-
-	for(let sec=0; sec < 16; sec++) {
-
-		readRowWithDetails("Sector", ()=>{
 		
-		read(27);
-		let startOffset = getOffset();
-		let headerData = getData();
-		let header = parseSectorHeader(headerData);
-		if (header.headerLen < 27) {
-			setOffset(startOffset);
-			read(header.headerLen);
-		}
+			let currentTrk = trk;
+			readRowWithDetails("Track", () => {
 
-		currentTrk = header.trackNo;
+			for(let sec=0; sec < 16; sec++) {
 
-		addRow("Header", 'T:'+header.trackNo+' S:'+header.secNo, 
-				'Header of Sector '+header.secNo+' on Track '+header.trackNo);
+				readRowWithDetails("Sector", ()=>{
+				
+					read(27);
+					let startOffset = getOffset();
+					let headerData = getData();
+					let header = parseSectorHeader(headerData);
+					if (header.headerLen < 27) {
+						setOffset(startOffset);
+						read(header.headerLen);
+					}
+					currentTrk = header.trackNo;
 
-		addDetails(()=> {
-			// GAP1 
-			
-			read(header.gap1Len);
-			let gap1 = getData();
-			addRow('GAP1', 'Enter', getHexSequence(gap1));
-			
-			//IDAM Start
-			read(4);
-			let IDAMStart = getData();
-			addRow('IDAM', 'IDAM (in)', getHexSequence(IDAMStart));
-			
-			// Track Number
-			read(1);
-			let trackNo = getNumberValue();
-			addRow('Track', trackNo ,'Track number '+trackNo.toString());
+					addRow("Header", 'T:'+header.trackNo+' S:'+header.secNo, 
+							'Header of Sector '+header.secNo+' on Track '+header.trackNo);
 
-			// Sector Number
-			read(1);
-			let secNo = getNumberValue();
-			addRow('Sector', secNo ,'Sector number '+secNo.toString());
+					addDetails(()=> {
+						// GAP1 
+						
+						read(header.gap1Len);
+						let gap1 = getData();
+						addRow('GAP1', 'Enter', getHexSequence(gap1));
+						
+						//IDAM Start
+						read(4);
+						let IDAMStart = getData();
+						addRow('IDAM', 'IDAM (in)', getHexSequence(IDAMStart));
+						
+						// Track Number
+						read(1);
+						let trackNo = getNumberValue();
+						addRow('Track', trackNo ,'Track number '+trackNo.toString());
 
-			// CRC
-			read(1);
-			let crc = getNumberValue();
-			addRow('CRC', crc ,'CRC for Track and Sector number (expected '+(trackNo+secNo).toString()+')');
+						// Sector Number
+						read(1);
+						let secNo = getNumberValue();
+						addRow('Sector', secNo ,'Sector number '+secNo.toString());
 
-			// GAP2
-			read(header.gap2Len);
-			let gap2 = getData();
-			addRow('GAP2', 'Exit', getHexSequence(gap2));
-			
-			//IDAM End
-			read(4);
-			let IDAMEnd = getData();
-			addRow('IDAM', 'IDAM (out)', getHexSequence(IDAMEnd));
-		});
+						// CRC
+						read(1);
+						let crc = getNumberValue();
+						addRow('CRC', crc ,'CRC for Track and Sector number (expected '+(trackNo+secNo).toString()+')');
 
-		read(128);
-		addRow('Sector', 'Data', 'Sector Data');
-		addDetails(() => {
-			read(128);
-			addMemDump();
-		});
+						// GAP2
+						read(header.gap2Len);
+						let gap2 = getData();
+						addRow('GAP2', 'Exit', getHexSequence(gap2));
+						
+						//IDAM End
+						read(4);
+						let IDAMEnd = getData();
+						addRow('IDAM', 'IDAM (out)', getHexSequence(IDAMEnd));
+					});
 
-		read(2);
-		let secCrc = getHexValue().toUpperCase();
-		addRow('Sec CRC', '0x'+secCrc, 'CRC of Sector data');
+					read(128);
+					addRow('Sector', 'Data', 'Sector Data');
+					addDetails(() => {
+						read(128);
+						addMemDump();
+					});
 
-		return {
-			value: ''+header.secNo,
-			description: 'Sector '+header.secNo+' on Track '+header.trackNo
-		};
-	});
+					read(2);
+					let secCrc = getHexValue().toUpperCase();
+					addRow('Sec CRC', '0x'+secCrc, 'CRC of Sector data');
+
+					return {
+						value: ''+header.secNo,
+						description: 'Sector '+header.secNo+' on Track '+header.trackNo
+					};
+				}); // sector row
+			}
+			// some disk images have 15 or 16 bytes long (0x00) track separator 
+			if (!endOfFile()) {
+				read(16);
+				let sepOffset = getOffset();
+				let sepData = getData();
+				if (sepData[0] == 0)
+					addMemDump();
+				else
+					setOffset(sepOffset);
+			}
+			let s_desc = (currentTrk == trk) ? ' ('+trk+')' 
+				: ' <span style="color:red">(expected '+trk+')</span>';
+			return {
+				value: currentTrk,
+				description: 'Track '+currentTrk+s_desc
+			};
+		}); // track row
 	}
-	// some disk images have 15 or 16 bytes long (0x00) track separator 
-	if (!endOfFile()) {
-		read(16);
-		addMemDump();
-	}
-	return {
-		value: currentTrk,
-		description: 'Track '+currentTrk+' ('+trk+')'
-	};
-});
-}
 
 });
