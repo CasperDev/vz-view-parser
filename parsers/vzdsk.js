@@ -87,12 +87,26 @@ function getHexSequence(data) {
 	return s;
 }
 
+function err(s) {
+	return ' <span style="color: red">'+s+'</span>';
+}
+
+function isGapValid(buffer, start, end) {
+	if (buffer[end-1] != 0x00)
+		return false;
+	for(let i=start; i<end-1;i++) {
+		if (buffer[i] != 0x80) return false;
+	}
+	return true;
+}
 function parseSectorHeader(header) 
 {
 	let gap1Len = (header[7] == 0 && header[8] == 0xfe) ? 8
 				: (header[6] == 0 && header[7] == 0xfe) ? 7
 				: (header[5] == 0 && header[6] == 0xfe) ? 6
 				: 1;
+	let gap1valid = isGapValid(header,0,gap1Len);
+	let IDAMinValid = header[gap1Len+1] == 0xe7 && header[gap1Len+2] == 0x18 && header[gap1Len+3] == 0xc3;
 	let trackNo = header[gap1Len+4];
 	let secNo   = header[gap1Len+5];
 	let trackSecCrc = header[gap1Len+6];
@@ -101,128 +115,234 @@ function parseSectorHeader(header)
 				: (header[startGap2+6] == 0 && header[startGap2+7] == 0xc3) ? 7
 				: (header[startGap2+5] == 0 && header[startGap2+6] == 0xc3) ? 6
 				: 1;
+	let gap2valid = isGapValid(header,startGap2,gap2Len+startGap2);
+	let IDAMoutValid = header[startGap2+gap2Len+1] == 0x18 && header[startGap2+gap2Len+2] == 0xe7 && header[startGap2+gap2Len+3] == 0xfe;
 	let headerLen = gap1Len+4+3+gap2Len+4;
 	let valid = false;
 	if (gap1Len > 1 && gap2Len > 1 
-		&& header[gap1Len+1] == 0xe7 && header[gap1Len+2] == 0x18 && header[gap1Len+3] == 0xc3
-		&& header[startGap2+gap2Len+1] == 0x18 && header[startGap2+gap2Len+2] == 0xe7 && header[startGap2+gap2Len+3] == 0xfe)
+		&& IDAMinValid
+		&& IDAMoutValid)
 		valid = true;
 
 	return {
 		valid: valid,
 		headerLen: headerLen,
 		gap1Len: gap1Len,
+		gap1valid: gap1valid,
+		IDAMinValid: IDAMinValid,
+		IDAMoutValid: IDAMoutValid,
 		gap2Len: gap2Len,
+		gap2valid: gap2valid,
 		trackNo: trackNo,
 		secNo: secNo,
 		trackSecCrc: trackSecCrc,
 	};
+}
+
+var SectorNumbers = [0, 11, 6, 1, 12, 7, 2, 13, 8, 3, 14, 9, 4, 15, 10, 5];
+
+function addSectorHeader(sec,trk) {
+	
+	let HeaderErrors = [];
+
+	// read(27);
+	// let startOffset = getOffset();
+	// let headerData = getData();
+	// let header = parseSectorHeader(headerData);
+	// if (header.headerLen < 27) {
+	// 	setOffset(startOffset);
+	// 	read(header.headerLen);
+	// }
+	
+	//addRow("Header", 'T:'+header.trackNo+' S:'+header.secNo, s_header_desc);
+	var header = {};
+
+	readRowWithDetails('Header', ()=> {
+		
+		// preload header fields 
+
+		read(27);
+		let startOffset = getOffset();
+		let headerData = getData();
+		header = parseSectorHeader(headerData);
+		// reset offset 
+		setOffset(startOffset);
+	
+		// GAP1 
+		
+		read(header.gap1Len);
+		let gap1 = getData();
+		let gapdesc = getHexSequence(gap1);
+		if (header.gap1valid == false) {
+			HeaderErrors.push('Inavlid GAP1');
+			gapdesc += err('Invalid');
+		}
+		addRow('GAP1', 'Enter', gapdesc);
+		
+		//IDAM Start
+		
+		read(4);
+		let IDAMStart = getData();
+		let IDAMStartDesc = getHexSequence(IDAMStart);
+		if (header.IDAMinValid == false) {
+			HeaderErrors.push('Inavlid IDAM in');
+			IDAMStartDesc += err('(expected FE E7 18 C3)');
+		}
+		addRow('IDAM', 'IDAM (in)', IDAMStartDesc);
+		
+		// Track Number
+		read(1);
+		
+		let trackNo = getNumberValue();
+		let trackNoDesc = 'Track number '+trackNo.toString();
+		if (trk != header.trackNo) {
+			HeaderErrors.push('Wrong Track number');
+			trackNoDesc += err("(expected "+trk.toString()+')');
+		}
+		addRow('Track', trackNo, trackNoDesc);
+
+		// Sector Number
+		read(1);
+		let secNo = getNumberValue();
+		let secNoDesc = 'Sector number '+secNo.toString();
+		if (SectorNumbers[sec] != header.secNo) {
+			HeaderErrors.push('Wrong Sector number');
+			secNoDesc += err("(expected "+SectorNumbers[sec].toString()+')');
+		}
+		addRow('Sector', secNo, secNoDesc);
+
+		// CRC
+		read(1);
+		let crc = getNumberValue();
+		let crcDesc = 'Track + Sector CRC';
+		if (crc != secNo + trackNo) {
+			HeaderErrors.push('Invalid Sec+Trk CRC');
+			crcDesc += err("(expected "+(secNo+trackNo).toString()+')');
+		}
+		addRow('CRC', crc ,crcDesc);
+
+		// GAP2
+		read(header.gap2Len);
+		let gap2 = getData();
+		let gap2desc = getHexSequence(gap2);
+		if (header.gap2valid == false) {
+			HeaderErrors.push('Inavlid GAP2');
+			gap2desc += err('Invalid');
+		}
+		addRow('GAP2', 'Exit', gap2desc);
+		
+		//IDAM End
+		read(4);
+		let IDAMEnd = getData();
+		let IDAMEndDesc = getHexSequence(IDAMEnd);
+		if (header.IDAMoutValid == false) {
+			HeaderErrors.push('Inavlid IDAM out');
+			IDAMEndDesc += err('(expected C3 18 E7 FE)');
+		}
+		addRow('IDAM', 'IDAM (out)', IDAMEndDesc);
+		
+		let s_header_desc = 'Header of Sector '+header.secNo+' on Track '+header.trackNo;
+		if (HeaderErrors.length != 0) {
+			s_header_desc += err(HeaderErrors.toString());
+		}
+		
+		return {
+			value: 'T:'+header.trackNo+' S:'+header.secNo,
+			description: s_header_desc
+		};
+	});
+	return {
+		trackNo: header.trackNo,
+		secNo: header.secNo,
+		valid: HeaderErrors.length == 0 ? true : false
+	};
+}
+function addSectorRow(sec,trk) {
+	let SectorErrors = [];
+			
+	readRowWithDetails("Sector", ()=>{
+	
+		let header = addSectorHeader(sec,trk);
+		if (header.valid == false) {
+			SectorErrors.push('Invalid Header');
+		}
+
+		read(128);
+		let secData = getData();
+		addRow('Sector', 'Data', 'Sector Data');
+		addDetails(() => {
+			read(128);
+			addMemDump();
+		});
+
+		let secCrcCalc = 0;
+		for (let index = 0; index < secData.length; index++) {
+			const element = secData[index];
+			secCrcCalc = secCrcCalc + element;
+		}
+		read(2);
+		let secCrc = getNumberValue();
+		let secCrcHex = '0x'+getHexValue();
+		let s_crcdesc = 'CRC of Sector data';
+		if (secCrc != secCrcCalc) {
+			s_crcdesc += err('(expected '+getHexByte(secCrcCalc)+')');
+			SectorErrors.push('Wrong CRC');
+		}
+		addRow('Sec CRC', secCrcHex, s_crcdesc);
+
+		let s_desc = 'Sector '+header.secNo.toString()+' on Track '+header.trackNo.toString();
+		if (SectorErrors.length != 0) { 
+			s_desc += '' +err(SectorErrors.toString());
+		}
+		return {
+			value: ''+header.secNo,
+			description:  s_desc
+		};
+	}); // sector row
+	if (SectorErrors.length == 0) return true; else return false;
+}
+
+function addTrackRow(trk) {
+
+	let currentTrk = trk;
+	readRowWithDetails("Track", () => {
+	let sectorsWithErrors = [];
+
+		for(let sec=0; sec < 16; sec++) {
+			if (addSectorRow(sec,trk) != true)
+				sectorsWithErrors.push(SectorNumbers[sec]);
+		}
+		// some disk images have 15 or 16 bytes long (0x00) track separator 
+		if (!endOfFile()) {
+			read(16);
+			let sepOffset = getOffset();
+			let sepData = getData();
+			if (sepData[0] == 0)
+				addMemDump();
+			else
+				setOffset(sepOffset);
+		}
+		let s_desc = (sectorsWithErrors.length == 0) ? '' 
+			: ' <span style="color:red">(ERR in Sectors: '+sectorsWithErrors.toString()+')</span>';
+		return {
+			value: currentTrk,
+			description: 'Track '+currentTrk+s_desc
+		};
+	}); // track row
+
 }
 /**
  * Parser for VZ files.
  * It is not a complete wav parsing implementation.
  */
 registerParser(() => {
-    
 
-    addStandardHeader();
+	addStandardHeader();
 	
 	// -------  40 tracks to read -------------
 
 	for(let trk=0; trk < 40; trk++) {
-		
-			let currentTrk = trk;
-			readRowWithDetails("Track", () => {
-
-			for(let sec=0; sec < 16; sec++) {
-
-				readRowWithDetails("Sector", ()=>{
-				
-					read(27);
-					let startOffset = getOffset();
-					let headerData = getData();
-					let header = parseSectorHeader(headerData);
-					if (header.headerLen < 27) {
-						setOffset(startOffset);
-						read(header.headerLen);
-					}
-					currentTrk = header.trackNo;
-
-					addRow("Header", 'T:'+header.trackNo+' S:'+header.secNo, 
-							'Header of Sector '+header.secNo+' on Track '+header.trackNo);
-
-					addDetails(()=> {
-						// GAP1 
-						
-						read(header.gap1Len);
-						let gap1 = getData();
-						addRow('GAP1', 'Enter', getHexSequence(gap1));
-						
-						//IDAM Start
-						read(4);
-						let IDAMStart = getData();
-						addRow('IDAM', 'IDAM (in)', getHexSequence(IDAMStart));
-						
-						// Track Number
-						read(1);
-						let trackNo = getNumberValue();
-						addRow('Track', trackNo ,'Track number '+trackNo.toString());
-
-						// Sector Number
-						read(1);
-						let secNo = getNumberValue();
-						addRow('Sector', secNo ,'Sector number '+secNo.toString());
-
-						// CRC
-						read(1);
-						let crc = getNumberValue();
-						addRow('CRC', crc ,'CRC for Track and Sector number (expected '+(trackNo+secNo).toString()+')');
-
-						// GAP2
-						read(header.gap2Len);
-						let gap2 = getData();
-						addRow('GAP2', 'Exit', getHexSequence(gap2));
-						
-						//IDAM End
-						read(4);
-						let IDAMEnd = getData();
-						addRow('IDAM', 'IDAM (out)', getHexSequence(IDAMEnd));
-					});
-
-					read(128);
-					addRow('Sector', 'Data', 'Sector Data');
-					addDetails(() => {
-						read(128);
-						addMemDump();
-					});
-
-					read(2);
-					let secCrc = getHexValue().toUpperCase();
-					addRow('Sec CRC', '0x'+secCrc, 'CRC of Sector data');
-
-					return {
-						value: ''+header.secNo,
-						description: 'Sector '+header.secNo+' on Track '+header.trackNo
-					};
-				}); // sector row
-			}
-			// some disk images have 15 or 16 bytes long (0x00) track separator 
-			if (!endOfFile()) {
-				read(16);
-				let sepOffset = getOffset();
-				let sepData = getData();
-				if (sepData[0] == 0)
-					addMemDump();
-				else
-					setOffset(sepOffset);
-			}
-			let s_desc = (currentTrk == trk) ? ' ('+trk+')' 
-				: ' <span style="color:red">(expected '+trk+')</span>';
-			return {
-				value: currentTrk,
-				description: 'Track '+currentTrk+s_desc
-			};
-		}); // track row
+		addTrackRow(trk);
 	}
 
 });
