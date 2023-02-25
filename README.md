@@ -13,6 +13,9 @@ VZ mixed BASIC and Binary file view
 VZ Disk Image view
 ![VZ Disk Image view](docs/vz-preview-3.png)
 
+VZ Disk Image Error detected
+![VZ Disk Image view](docs/vz-preview-4.png)
+
 ## Supported files
 
 VZ Files are recognized by File Description Header - 4 bytes at the begining of file commonly used as signature since DOS (like 'RIFF' for *.WAV etc). Disk Image files are considered valid 
