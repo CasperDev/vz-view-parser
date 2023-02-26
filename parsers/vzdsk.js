@@ -317,7 +317,7 @@ function addTrackRow(trk) {
 			read(16);
 			let sepOffset = getOffset();
 			let sepData = getData();
-			if (sepData[0] == 0)
+			if (sepData[0] != 0x80)
 				addMemDump();
 			else
 				setOffset(sepOffset);
