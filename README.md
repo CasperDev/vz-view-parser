@@ -29,7 +29,7 @@ As for now Parser Plugin supports files:
 
 ## Supported file content types
 
-VZ Snapshot file header:
+### VZ Snapshot file header:
 
 | Offset  | Size     | Description                         |
 |---------|----------|-------------------------------------|
@@ -45,6 +45,31 @@ As for now Parser supports Content Types:
 - 0xf0 BASIC Program 
 - 0xf0 BASIC Program/Loader with following binary code 
 - 0xf1 Binary program from start to end
+
+### VZ Tape (CVZ) file structure:
+
+| Offset  | Size     | Description                             |
+|---------|----------|-----------------------------------------|
+|  0      | 255 bytes| Tape Lead in Start sequence of 0x80 byte|
+|  255    | 5 bytes  | Tape Lead in End sequence of 0xFE byte  |
+|  260    | 1 byte   | Content Type (see below)                |
+|  261    | 16* chars| Internal Program Name (max 16 chars)    |
+|  277*   | 1 byte   | Text terminator (always 0)              |
+|  278*   | 2 bytes  | 16-bit address to Load content          |
+|  280*   | 2 bytes  | 16-bit address of End of content        |
+|  282*   | x bytes  | content (length = End addr - Load addr) |
+|  x+282* | 2 bytes  | 16-bit CRC of content data              |
+|  x+284* | 20 bytes | Tape Lead out sequence of 0x00 byte     |
+
+Content Type byte determines what kind of data are in the file.
+
+As for now Parser supports Content Types:
+- 0xf0 BASIC Program 
+- 0xf0 BASIC Program/Loader with following binary code 
+- 0xf1 Binary program from start to end
+
+
+### DSK Image file structure:
 
 DSK Image file structure:
  - 40 * track data block
@@ -63,7 +88,7 @@ DSK Image file structure:
 
 NOTE: VZ300 Technical Manual describes GAP1 as 7 bytes of 0x80 + 0x00 and GAP2 as 5 bytes of 0x80 + 0x00. However number of 0x80 bytes in these GAP blocks varies beetween 5 and 7 even if the same file. All variants are supported.
 
-VZ DOS Disk logical structure:
+### VZ DOS Disk logical structure:
 
 The DOS uses Track 0, Sector 0 to 14 as the directory. Track 0 sector 15 is used to hold the track map of the disk with one bit corresponding to a sector used (low significant bit first).
 Each directory entry contains 16 bytes. Therefore 1 sector can hold 8 entries and 1 diskette can have a maximum of 112 entries.
