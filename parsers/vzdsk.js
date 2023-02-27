@@ -108,7 +108,8 @@ function isBufferFilledWith(buffer, data, start, len) {
 }
 function parseSectorHeader(header) 
 {
-	let gap1Len = (header[7] == 0 && header[8] == 0xfe) ? 8
+	let gap1Len = (header[8] == 0 && header[9] == 0xfe) ? 9
+				: (header[7] == 0 && header[8] == 0xfe) ? 8
 				: (header[6] == 0 && header[7] == 0xfe) ? 7
 				: (header[5] == 0 && header[6] == 0xfe) ? 6
 				: 1;
@@ -118,7 +119,8 @@ function parseSectorHeader(header)
 	let secNo   = header[gap1Len+5];
 	let trackSecCrc = header[gap1Len+6];
 	let startGap2 = gap1Len+7;
-	let gap2Len = (header[startGap2+7] == 0 && header[startGap2+8] == 0xc3) ? 8
+	let gap2Len = (header[startGap2+8] == 0 && header[startGap2+9] == 0xc3) ? 9
+				: (header[startGap2+7] == 0 && header[startGap2+8] == 0xc3) ? 8
 				: (header[startGap2+6] == 0 && header[startGap2+7] == 0xc3) ? 7
 				: (header[startGap2+5] == 0 && header[startGap2+6] == 0xc3) ? 6
 				: 1;
@@ -147,6 +149,7 @@ function parseSectorHeader(header)
 }
 
 var SectorNumbers = [0, 11, 6, 1, 12, 7, 2, 13, 8, 3, 14, 9, 4, 15, 10, 5];
+var SectorNumbersFast = [0, 8, 1, 9, 2, 10, 3, 11, 4, 12, 5, 13, 6, 14, 7, 15];
 
 function addSectorHeader(sec,trk) {
 	
@@ -212,9 +215,9 @@ function addSectorHeader(sec,trk) {
 		read(1);
 		let secNo = getNumberValue();
 		let secNoDesc = 'Sector number '+secNo.toString();
-		if (SectorNumbers[sec] != header.secNo) {
+		if (SectorNumbers[sec] != header.secNo && SectorNumbersFast[sec] != header.secNo) {
 			HeaderErrors.push('Wrong Sector number');
-			secNoDesc += err("(expected "+SectorNumbers[sec].toString()+')');
+			secNoDesc += err("(expected "+SectorNumbers[sec].toString()+' or '+SectorNumbersFast[sec].toString()+')');
 		}
 		addRow('Sector', secNo, secNoDesc);
 
