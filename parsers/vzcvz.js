@@ -115,9 +115,10 @@ registerParser(() => {
 
 	addLeadIn();
 
+	// File type byte
 	let ftype = addFileType()
 
-	 // File type byte
+	// Program Name (variable length, null terminated string)
 	readRowWithDetails('Program Name',()=>{
 		readUntil(0);
 		let name = '"'+getStringValue()+'"';
@@ -131,6 +132,9 @@ registerParser(() => {
 			description: desc
 		}
 	});
+	
+	// Calculated CRC for Start Address, End Address and data bytes
+	let dataCrcCalc = 0;
 
 	if (ftype == 0xf0) {
 
@@ -138,9 +142,8 @@ registerParser(() => {
          * BASIC lines
          *******************************************************************/
 
-		let dataCrcCalc = 0;
 
-        // load/start address
+        // 16-bit load/start address
         read(2);
         let basicLineAbsAddr = getNumberValue();
         let basicLineHexAddr = getHex0xValue();
@@ -152,7 +155,7 @@ registerParser(() => {
 		read(2);
 		let basicEndAbsAddr = getNumberValue();
         let basicEndHexAddr = getHex0xValue();
-        addRow('End Addr',basicEndHexAddr, 'End of Program data');
+        addRow('End Addr',basicEndHexAddr, 'Address of End of Program data');
         dataCrcCalc += basicEndAbsAddr & 0xff;
         dataCrcCalc += (basicEndAbsAddr / 256) & 0xff;
 
@@ -194,38 +197,36 @@ registerParser(() => {
                 return retVal;
             });        
         }
-		// stored CRC
-		read(2);
-		let dataCrc = getNumberValue();
-		let dataCrcHex = getHex0xValue();
-		let s_crcdesc = 'CRC of Program data';
-		if (dataCrc != dataCrcCalc) {
-			s_crcdesc += err('(expected '+getHexByte(dataCrcCalc)+')');
-		}
-		addRow('Sec CRC', dataCrcHex, s_crcdesc);
-
-		addLeadOut();
-		// if (!endOfFile()) {
-		// 	read();
-		// 	let leadOutData = getData();
-		// 	let leadOutDesc = 'Tape Lead Out Footer';
-		// 	if (leadOutData.length != 20) {
-		// 		leadOutDesc += err('(expected 20 bytes but '+leadOutData.length.toString()+' found)');
-		// 	}
-		// 	addRow('Lead out','00.. ', addMemDump();
-		// }
     } else if (ftype == 0xf1) {
         
         /*******************************************************************
          * Binary code to execute
          *******************************************************************/
-        // load/start address
-        read(2);
-        addRow('Load Addr',getHex0xValue(), 'Addres to load following code. Start of execution');
         
+        // 16-bit load/start address
+        read(2);
+        let codeAbsAddr = getNumberValue();
+        let codeHexAddr = getHex0xValue();
+        addRow('Load Addr',codeHexAddr, 'Addres to load following code. Start of execution');
+        dataCrcCalc += codeAbsAddr & 0xff;
+        dataCrcCalc += (codeAbsAddr / 256) & 0xff;
+
+		// load/end address
+		read(2);
+		let codeEndAbsAddr = getNumberValue();
+        let codeEndHexAddr = getHex0xValue();
+        addRow('End Addr',codeEndHexAddr, 'Address of End of Program data');
+        dataCrcCalc += codeEndAbsAddr & 0xff;
+        dataCrcCalc += (codeEndAbsAddr / 256) & 0xff;
+        
+		let codeLength = codeEndAbsAddr - codeAbsAddr;
         //read(); //read to the end
         //addRow('Code Dump');
-        read();
+        read(codeLength);
+		let data = getData();
+		data.forEach((b)=>{ dataCrcCalc += b; })
+		dataCrcCalc &= 0xffff;
+		
         addMemDump();
 
     } else {
@@ -237,7 +238,17 @@ registerParser(() => {
         addMemDump();
 
     }
+	// stored CRC
+	read(2);
+	let dataCrc = getNumberValue();
+	let dataCrcHex = getHex0xValue();
+	let s_crcdesc = 'CRC of Program data';
+	if (dataCrc != dataCrcCalc) {
+		s_crcdesc += err('(expected '+getHexByte(dataCrcCalc)+')');
+	}
+	addRow('Sec CRC', dataCrcHex, s_crcdesc);
 
+	addLeadOut();
 
 });
 
