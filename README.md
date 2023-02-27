@@ -26,6 +26,7 @@ As for now Parser Plugin supports files:
 - *.VZ with 'VZFO' [56 5A 46 4F] file description header (possibly mistaken change from '0' to 'O').
 - *.VZ with '  \0\0' [20 20 00 00] file description header (generated with z88dk tools)
 - *.DSK with 40 tracks and 16 sectors per track.
+- *.CVZ with 260 bytes Lead in and 20 bytes Lead out
 
 ## Supported file content types
 
