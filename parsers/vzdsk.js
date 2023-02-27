@@ -99,6 +99,13 @@ function isGapValid(buffer, start, end) {
 	}
 	return true;
 }
+function isBufferFilledWith(buffer, data, start, len) {
+	for(let i=start; i < start+len;i++) {
+		if (buffer[i] !== data)
+			return false;
+	};
+	return true;
+}
 function parseSectorHeader(header) 
 {
 	let gap1Len = (header[7] == 0 && header[8] == 0xfe) ? 8
@@ -304,29 +311,53 @@ function addSectorRow(sec,trk) {
 
 function addTrackRow(trk) {
 
-	let currentTrk = trk;
 	readRowWithDetails("Track", () => {
-	let sectorsWithErrors = [];
+	
+		let sectorsWithErrors = [];
 
 		for(let sec=0; sec < 16; sec++) {
 			if (addSectorRow(sec,trk) != true)
 				sectorsWithErrors.push(SectorNumbers[sec]);
 		}
+
+		let sepError = '';
 		// some disk images have 15 or 16 bytes long (0x00) track separator 
 		if (!endOfFile()) {
 			read(16);
 			let sepOffset = getOffset();
 			let sepData = getData();
-			if (sepData[0] != 0x80)
-				addMemDump();
-			else
+			// trim right 0x80
+			let sepDataLen = sepData.length;
+			if (sepData[0] != 0x80) {
+				while (sepDataLen > 0 && sepData[sepDataLen-1] == 0x80)
+					sepDataLen--;
+				let valid = isBufferFilledWith(sepData, 0x00, 0, sepDataLen);
+				let sepDesc = 'Track Separator ('+sepDataLen.toString()+' bytes)';
+				if (sepDataLen != 15 && sepDataLen != 16) {
+					sepDesc += err('(expected 15 or 16 bytes)');
+					sepError += ' Separator Length';
+				}
+				if (valid == false) {
+					sepDesc += err('non zero bytes in separator');
+					sepError += ' Separator Data';
+				}
 				setOffset(sepOffset);
+				read(sepDataLen);
+				addRow('Track Sep', sepDataLen.toString()+' x 00', sepDesc);
+				addDetails(()=>{
+					read(sepDataLen);
+					addMemDump();
+				});
+			} else {
+				setOffset(sepOffset);
+			}
+			
 		}
 		let s_desc = (sectorsWithErrors.length == 0) ? '' 
-			: ' <span style="color:red">(ERR in Sectors: '+sectorsWithErrors.toString()+')</span>';
+			: err('(ERR in Sectors: '+sectorsWithErrors.toString()+')'+sepError);
 		return {
-			value: currentTrk,
-			description: 'Track '+currentTrk+s_desc
+			value: trk,
+			description: 'Track '+trk.toString()+s_desc
 		};
 	}); // track row
 

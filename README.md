@@ -85,9 +85,9 @@ DSK Image file structure:
 	- Track number, Sector Number and CRC of these values
 	- GAP2 sync bytes (0x80,0x80,..0x00) (see NOTE below)
 	- IDAM End sequence (0xc3,0x18,0xe7,0xfe)
- - Some files contains extra 15 or 16 bytes of 0x00 as a "track separator" after each Track data block.
+ - Some files contains extra 15 or 16 bytes of 0x00 as a "track separator" after each Track data block (except last one).
 
-NOTE: VZ300 Technical Manual describes GAP1 as 7 bytes of 0x80 + 0x00 and GAP2 as 5 bytes of 0x80 + 0x00. However number of 0x80 bytes in these GAP blocks varies beetween 5 and 7 even if the same file. All variants are supported.
+NOTE: VZ300 Technical Manual describes GAP1 as 7 bytes of 0x80 + 0x00 and GAP2 as 5 bytes of 0x80 + 0x00. However number of 0x80 bytes in these GAP blocks varies beetween 5 and 7 even in the same file. All variants are supported.
 
 ### VZ DOS Disk logical structure:
 
