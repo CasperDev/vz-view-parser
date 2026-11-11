@@ -110,7 +110,7 @@ NOTE: VZ300 Technical Manual describes above structure fields in different order
 
  ## Install
 
-1. Copy 'vzf0.js' and 'vzdsk.js' files to chosen folder (e.g.: C:\repos\vz-view-parser\)
+1. Copy 'vzf0.js','vzcvz.js' and 'vzdsk.js' files to chosen folder (e.g.: C:\repos\vz-view-parser\)
 2. Install [**"Binary File Viewer"**](https://github.com/maziac/binary-file-viewer) through Visual Studio Code Marketplace.
 3. Open Extension Settings and add Parsers Folder where are 'vzf0.js' 'vzdsk.js' files file (e.g.: C:\repos\vz-view-parser\)
 4. (optional) Install **Hot Coco** font from fonts/hotcoco.zip file.
